@@ -1,20 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  darkMode: 'class',
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        surface: {
-          DEFAULT: 'rgb(248 250 252)',
-          dark: 'rgb(17 24 39)',
-        },
-        accent: {
-          DEFAULT: 'rgb(59 130 246)',
-          dark: 'rgb(96 165 250)',
-        },
+        surface: 'var(--surface)',
+        'surface-muted': 'var(--surface-muted)',
+        'surface-strong': 'var(--surface-strong)',
+        accent: 'var(--accent)',
+        'accent-strong': 'var(--accent-strong)'
       },
-    },
+      boxShadow: {
+        panel: '0 1px 3px rgba(15, 23, 42, 0.1)'
+      }
+    }
   },
-  plugins: [],
+  plugins: []
 };

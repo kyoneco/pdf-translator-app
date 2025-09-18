@@ -4,13 +4,21 @@ import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextContent } from 'pd
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import type { ViewerSource } from '../types/viewer';
 
-GlobalWorkerOptions.workerSrc = workerSrc;
+const baseUrl = typeof __BASE_URL__ !== 'undefined' ? __BASE_URL__ : import.meta.env.BASE_URL;
+const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+const resolvedWorkerSrc = workerSrc.startsWith('http')
+  ? workerSrc
+  : workerSrc.startsWith(normalizedBase)
+    ? workerSrc
+    : `${normalizedBase}${workerSrc.startsWith('/') ? workerSrc : `/${workerSrc}`}`;
+
+GlobalWorkerOptions.workerSrc = resolvedWorkerSrc;
 
 type ViewerPaneProps = {
   source: ViewerSource | null;
   currentPage: number;
   onPageCountChange: (count: number) => void;
-  onPageTextChange: (text: string) => void;
+  onTextExtracted: (text: string) => void;
   onLoadingChange?: (loading: boolean) => void;
 };
 
@@ -32,7 +40,7 @@ export function ViewerPane({
   source,
   currentPage,
   onPageCountChange,
-  onPageTextChange,
+  onTextExtracted,
   onLoadingChange,
 }: ViewerPaneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -52,14 +60,14 @@ export function ViewerPane({
     if (!source) {
       setPdfDocument(null);
       onPageCountChange(0);
-      onPageTextChange('');
+      onTextExtracted('');
       return;
     }
 
     if (source.type === 'pdf') {
       const task = getDocument({ data: source.data });
-      onPageTextChange('');
       onLoadingChange?.(true);
+      onTextExtracted('');
       task.promise
         .then((document) => {
           setPdfDocument(document);
@@ -67,8 +75,9 @@ export function ViewerPane({
         })
         .catch((error) => {
           console.error('Failed to load PDF', error);
+          setPdfDocument(null);
           onPageCountChange(0);
-          onPageTextChange('');
+          onTextExtracted('');
         })
         .finally(() => {
           onLoadingChange?.(false);
@@ -78,16 +87,16 @@ export function ViewerPane({
       };
     }
 
-    if (source.type === 'html') {
-      setPdfDocument(null);
-      onPageCountChange(1);
-      onPageTextChange(extractTextFromHtml(source.content));
-      if (iframeRef.current) {
-        iframeRef.current.srcdoc = source.content;
-      }
-      onLoadingChange?.(false);
+    setPdfDocument(null);
+    onPageCountChange(1);
+    const text = extractTextFromHtml(source.content);
+    onTextExtracted(text);
+    if (iframeRef.current) {
+      iframeRef.current.srcdoc = source.content;
     }
-  }, [source, onLoadingChange, onPageCountChange, onPageTextChange]);
+    onLoadingChange?.(false);
+    return () => undefined;
+  }, [source, onLoadingChange, onPageCountChange, onTextExtracted]);
 
   useEffect(() => {
     if (!pdfDocument || !isPdf) {
@@ -95,9 +104,6 @@ export function ViewerPane({
     }
 
     const safePage = Math.min(Math.max(currentPage, 1), pdfDocument.numPages);
-    if (safePage !== currentPage) {
-      onPageTextChange('');
-    }
 
     const renderPage = async (pageNumber: number) => {
       onLoadingChange?.(true);
@@ -105,7 +111,8 @@ export function ViewerPane({
         const page: PDFPageProxy = await pdfDocument.getPage(pageNumber);
         const viewport = page.getViewport({ scale: 1 });
         const containerWidth = containerRef.current?.clientWidth ?? viewport.width;
-        const scale = Math.max(containerWidth / viewport.width, 1);
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const scale = Math.max((containerWidth / viewport.width) * 0.98, 1);
         const scaledViewport = page.getViewport({ scale });
         const canvas = canvasRef.current;
         if (!canvas) {
@@ -115,8 +122,11 @@ export function ViewerPane({
         if (!context) {
           return;
         }
-        canvas.height = scaledViewport.height;
-        canvas.width = scaledViewport.width;
+        canvas.style.width = `${scaledViewport.width}px`;
+        canvas.style.height = `${scaledViewport.height}px`;
+        canvas.width = Math.floor(scaledViewport.width * devicePixelRatio);
+        canvas.height = Math.floor(scaledViewport.height * devicePixelRatio);
+        context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         if (renderTaskRef.current) {
           renderTaskRef.current.cancel();
         }
@@ -124,10 +134,12 @@ export function ViewerPane({
         renderTaskRef.current = task;
         await task.promise;
         const textContent = await page.getTextContent();
-        onPageTextChange(extractText(textContent));
+        onTextExtracted(extractText(textContent));
       } catch (error) {
-        console.error('Failed to render PDF page', error);
-        onPageTextChange('');
+        if ((error as Error).name !== 'RenderingCancelledException') {
+          console.error('Failed to render PDF page', error);
+          onTextExtracted('');
+        }
       } finally {
         onLoadingChange?.(false);
       }
@@ -140,32 +152,44 @@ export function ViewerPane({
         renderTaskRef.current.cancel();
       }
     };
-  }, [pdfDocument, currentPage, isPdf, onLoadingChange, onPageTextChange]);
+  }, [pdfDocument, currentPage, isPdf, onLoadingChange, onTextExtracted]);
 
   const pdfVersion = useMemo(() => (isPdf ? version : null), [isPdf]);
 
   return (
-    <section className="flex h-full flex-col bg-white dark:bg-slate-950">
-      <header className="flex items-center justify-between border-b border-[var(--panel-border)] px-4 py-3 text-sm font-semibold text-slate-700 dark:border-[var(--panel-border-dark)] dark:text-slate-100">
-        原文ビュー
+    <section className="panel" aria-label="原文ビュー">
+      <header className="panel__header">
+        <div className="flex flex-col">
+          <span>原文ビュー</span>
+          {source ? (
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{source.name}</span>
+          ) : (
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">ファイルを選択してください</span>
+          )}
+        </div>
         {pdfVersion ? (
           <span className="text-xs font-normal text-slate-500 dark:text-slate-400">PDF.js v{pdfVersion}</span>
         ) : null}
       </header>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-slate-50 p-4 dark:bg-slate-900">
+      <div ref={containerRef} className="panel__body">
         {!source ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-            PDF または HTML ファイルを読み込むとここに表示されます。
+          <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300" role="status">
+            PDF もしくは HTML ファイルを読み込むと表示されます。
           </div>
         ) : isPdf ? (
-          <canvas ref={canvasRef} className="mx-auto block max-w-full rounded-md border border-[var(--panel-border)] bg-white shadow-sm dark:border-[var(--panel-border-dark)]" />
+          <canvas
+            ref={canvasRef}
+            className="mx-auto block max-w-full rounded-md border border-slate-200 bg-white shadow dark:border-slate-700"
+            role="img"
+            aria-label={`${source.name} のページ ${currentPage}`}
+          />
         ) : (
           <iframe
             ref={iframeRef}
-            title="HTML preview"
+            title="HTML プレビュー"
             sandbox="allow-same-origin"
+            className="h-full w-full rounded-md border border-slate-200 bg-white shadow dark:border-slate-700"
             srcDoc={source.content}
-            className="h-full w-full rounded-md border border-[var(--panel-border)] bg-white shadow-sm dark:border-[var(--panel-border-dark)]"
           />
         )}
       </div>

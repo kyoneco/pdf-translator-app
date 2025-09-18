@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>PDF Translator</title>
+  <rect width="64" height="64" rx="12" fill="#2563eb" />
+  <path d="M18 18h20a8 8 0 0 1 8 8v4h-8a6 6 0 0 0-6 6v8H18a8 8 0 0 1-8-8V26a8 8 0 0 1 8-8z" fill="#f8fafc" />
+  <path d="M38 30h8l-12 16v-8a8 8 0 0 1 8-8z" fill="#1d4ed8" />
+  <text x="20" y="32" font-family="Arial, sans-serif" font-weight="700" font-size="12" fill="#1e3a8a">PDF</text>
+</svg>

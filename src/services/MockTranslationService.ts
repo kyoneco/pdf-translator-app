@@ -1,24 +1,29 @@
-import type { TranslationInput, TranslationService } from './TranslationService';
+import type { TranslationOptions, TranslationService, TranslationInput } from './TranslationService';
 
-const MOCK_LATENCY_MS = 600;
+const DELAY_MS = 800;
 
 export class MockTranslationService implements TranslationService {
-  async translate({ text, pageNumber, sourceName, targetLanguage }: TranslationInput): Promise<string> {
-    await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
+  async translate(input: TranslationInput, options: TranslationOptions = {}): Promise<string> {
+    const { signal } = options;
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
 
-    const header = `【Mock翻訳: ${targetLanguage.toUpperCase()}】`;
-    const pageLine = typeof pageNumber === 'number' ? `ページ: ${pageNumber}` : null;
+      const timer = setTimeout(() => {
+        const trimmed = input.text.slice(0, 100);
+        resolve(`(モック訳) ${trimmed}${input.text.length > 100 ? '…' : ''}`);
+      }, DELAY_MS);
 
-    return [
-      header,
-      `ファイル: ${sourceName}`,
-      pageLine,
-      '',
-      text,
-      '',
-      '※ この結果はモックです。実際の翻訳APIと置き換えてください。',
-    ]
-      .filter(Boolean)
-      .join('\n');
+      signal?.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer);
+          reject(new DOMException('Aborted', 'AbortError'));
+        },
+        { once: true },
+      );
+    });
   }
 }

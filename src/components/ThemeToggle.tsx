@@ -1,8 +1,4 @@
-import * as Switch from '@radix-ui/react-switch';
-import { MoonIcon, SunIcon } from '@radix-ui/react-icons';
-import { clsx } from 'clsx';
-
-export type Theme = 'light' | 'dark';
+import type { Theme } from '../types/viewer';
 
 type ThemeToggleProps = {
   theme: Theme;
@@ -10,30 +6,20 @@ type ThemeToggleProps = {
 };
 
 export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
-  const isDark = theme === 'dark';
-
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
-      <SunIcon aria-hidden className="h-4 w-4" />
-      <Switch.Root
-        checked={isDark}
-        onCheckedChange={(checked) => onToggle(checked ? 'dark' : 'light')}
-        className={clsx(
-          'relative h-6 w-11 rounded-full transition-colors duration-200',
-          isDark
-            ? 'bg-[var(--accent-color-dark)] shadow-inner'
-            : 'bg-slate-300 shadow-inner dark:bg-slate-600',
-        )}
-      >
-        <Switch.Thumb
-          className={clsx(
-            'block h-5 w-5 translate-x-1 rounded-full bg-white shadow transition-transform duration-200',
-            isDark ? 'translate-x-[22px]' : 'translate-x-1',
-          )}
-        />
-      </Switch.Root>
-      <MoonIcon aria-hidden className="h-4 w-4" />
-    </label>
+    <button
+      type="button"
+      className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+      onClick={() => onToggle(nextTheme)}
+      aria-pressed={theme === 'dark'}
+      aria-label={theme === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
+    >
+      <span aria-hidden className="mr-2 text-lg">
+        {theme === 'dark' ? '🌙' : '☀️'}
+      </span>
+      {theme === 'dark' ? 'ダーク' : 'ライト'}
+    </button>
   );
 }
 
