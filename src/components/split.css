@@ -1,0 +1,21 @@
+.split {
+  display: flex;
+}
+
+.split .gutter {
+  background-color: var(--panel-border);
+  cursor: col-resize;
+  transition: background-color 0.2s ease;
+}
+
+.split .gutter:hover {
+  background-color: var(--accent-color);
+}
+
+:root.dark .split .gutter {
+  background-color: var(--panel-border-dark);
+}
+
+:root.dark .split .gutter:hover {
+  background-color: var(--accent-color-dark);
+}
